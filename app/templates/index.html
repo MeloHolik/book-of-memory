@@ -13,223 +13,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Literata:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
 
-  <style>
-    :root{
-      --page-w: 520px;
-      --page-h: 720px;
-      --book-w: calc(var(--page-w) * 2);
-      --book-h: var(--page-h);
-
-      --paper: #f6f0e6;
-      --paper-2: #f0e7d9;
-      --ink: #2b1b10;
-      --accent: #8b4a22;
-    }
-
-    body{
-      margin:0;
-      overflow:hidden;
-      color: var(--ink);
-      font-family: "Literata", Georgia, serif;
-      background:
-        radial-gradient(ellipse at center, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.65) 70%),
-        radial-gradient(ellipse at 30% 20%, rgba(255,180,120,0.08) 0%, rgba(0,0,0,0) 55%),
-        linear-gradient(180deg, #141414, #0b0b0b);
-    }
-
-    /* Сцена с глубокой перспективой */
-    #stage {
-      position:fixed;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      perspective: 2000px; /* Глубина 3D-пространства */
-    }
-
-    /* КОРЕНЬ ИЗОМЕТРИИ - именно он наклоняется */
-    #isometric-root {
-      position: relative;
-      width: var(--page-w);
-      height: var(--page-h);
-      transform-style: preserve-3d;
-      /* Стартовые значения задаются в GSAP */
-    }
-
-    /* --- 1. ТЕАТРАЛЬНАЯ ДЕКОРАЦИЯ (ТОЛЩИНА КНИГИ) --- */
-    #book-thickness {
-      position: absolute;
-      top: 0; left: 0;
-      width: var(--page-w);
-      height: var(--page-h);
-      background: var(--paper-2);
-      border-radius: 4px 14px 14px 4px;
-      /* Отодвигаем "толщину" назад по оси Z */
-      transform: translateZ(-15px);
-      transform-style: preserve-3d;
-      will-change: width;
-
-      /* Дорогая многослойная тень для объема */
-      box-shadow:
-        0 10px 20px rgba(0,0,0,0.4),
-        15px 30px 50px rgba(0,0,0,0.5),
-        -10px 40px 60px rgba(0,0,0,0.3);
-    }
-
-    /* Корешок (Слева) */
-    #spine-3d {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 15px; /* Совпадает с translateZ */
-      height: 100%;
-      background: linear-gradient(to right, #1a0d06, #3d1f0f);
-      transform-origin: left;
-      transform: rotateY(-90deg);
-      border-radius: 10px 0 0 10px;
-    }
-
-    /* Нижний срез страниц */
-    #pages-bottom-edge {
-      position: absolute;
-      left: 0;
-      bottom: 0;
-      width: 100%;
-      height: 15px;
-      background: repeating-linear-gradient(to right, #efe6d6 0px, #efe6d6 2px, #d8cbb5 4px);
-      transform-origin: bottom;
-      transform: rotateX(-90deg);
-      border-radius: 0 0 10px 0;
-    }
-
-    /* Правый срез страниц */
-    #pages-right-edge {
-      position: absolute;
-      right: 0;
-      top: 0;
-      width: 15px;
-      height: 100%;
-      background: repeating-linear-gradient(to bottom, #efe6d6 0px, #efe6d6 2px, #d8cbb5 4px);
-      transform-origin: right;
-      transform: rotateY(90deg);
-      border-radius: 0 10px 0 0;
-    }
-
-    /* --- 2. ИНТЕРАКТИВНАЯ ЧАСТЬ (ОКНО КНИГИ) --- */
-    #clip {
-      width: var(--page-w);
-      height: var(--page-h);
-      overflow:hidden;
-      border-radius: 4px 14px 14px 4px;
-      position: relative;
-      /* Выдвигаем интерактив чуть вперед, чтобы не мерцал */
-      transform: translateZ(1px);
-      will-change: width;
-      background: transparent;
-    }
-
-    #book-shell {
-      width: var(--book-w);
-      height: var(--book-h);
-      position:absolute;
-      left:0;
-      top:0;
-    }
-    #book { width: var(--book-w); height: var(--book-h); }
-    .page { background: var(--paper); }
-
-    .page-content {
-      height:100%;
-      padding: 38px 40px;
-      box-sizing:border-box;
-      display:flex;
-      flex-direction:column;
-      min-height: 0;
-      position: relative;
-      background:
-        radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 60%),
-        linear-gradient(180deg, var(--paper), var(--paper-2));
-    }
-
-    .page-content::before {
-      content:""; position:absolute; inset:0; pointer-events:none;
-      background:
-        linear-gradient(to right, rgba(0,0,0,0.12), rgba(0,0,0,0) 15%),
-        linear-gradient(to left, rgba(0,0,0,0.12), rgba(0,0,0,0) 15%);
-      opacity: .6; mix-blend-mode: multiply;
-    }
-
-    /* Стили типографики и фото (оставлены без изменений) */
-    h1,h2,h3 { font-family: "Cormorant Garamond", Georgia, serif; letter-spacing: .01em; }
-    .hero-title { font-size: 2.0rem; font-weight: 600; color: #6b2f14; text-align:center; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(139,74,34,.25); }
-    .photo-frame { border: 10px solid rgba(255,255,255,0.95); box-shadow: 0 10px 22px rgba(0,0,0,0.20); background: #efe7db; border-radius: 10px; overflow:hidden; aspect-ratio: 3/4; width: 100%; max-height: calc(var(--page-h) * 0.48); margin: 0 auto 18px; flex: 0 0 auto; display:flex; align-items:center; justify-content:center; }
-    .photo-frame img { width:100%; height:100%; object-fit: contain; object-position:center; display:block; }
-    .book-text { font-size: 1.15rem; line-height: 1.75; color: rgba(43,27,16,0.92); font-style: italic; text-align: justify; hyphens: auto; }
-    #toc-list { padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
-    #toc-list li { list-style:none; }
-    .toc-btn { width:100%; text-align:left; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.35); border: 1px solid rgba(139,74,34,.18); transition: transform .15s ease, background .15s ease; cursor:pointer; font-family: "Literata", Georgia, serif; font-size: 1.05rem; }
-    .toc-btn:hover { transform: translateX(6px); background: rgba(255,255,255,.55); }
-
-    /* --- 3. ОБЛОЖКА --- */
-    #front-cover {
-      position:absolute;
-      left:0;
-      top:0;
-      width: var(--page-w);
-      height: var(--page-h);
-      border-radius: 6px 16px 16px 6px;
-      transform-origin: left center;
-      transform-style: preserve-3d;
-      z-index: 50;
-      background: linear-gradient(135deg, #6f3718, #a15a2b);
-    }
-
-    /* Толщина самой обложки (картон) */
-    #front-cover::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: #3d1f0f;
-      transform: translateZ(-3px);
-      border-radius: 6px 16px 16px 6px;
-    }
-
-    #front-cover::after {
-      content:"";
-      position:absolute;
-      inset:0;
-      border-radius: 6px 16px 16px 6px;
-      background: linear-gradient(180deg, var(--paper), var(--paper-2));
-      transform: rotateY(180deg) translateZ(1px);
-      backface-visibility: hidden;
-    }
-
-    .cover-title {
-      position:absolute;
-      inset:0;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      color:#fff3d6;
-      text-shadow: 0 2px 10px rgba(0,0,0,.6);
-      transform: translateZ(2px);
-      padding: 34px;
-      text-align:center;
-      border: 2px solid rgba(255,255,255,.15);
-      margin: 16px;
-      border-radius: 10px;
-    }
-    .cover-title h1 { margin:0; font-size: 3.0rem; font-weight: 600; }
-    .cover-title p { margin-top:14px; opacity:.9; font-style:italic; font-size: 1.2rem; }
-  </style>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
 <body>
-
 <div id="stage">
   <div id="isometric-root">
-
     <div id="book-thickness">
       <div id="spine-3d"></div>
       <div id="pages-bottom-edge"></div>
@@ -237,194 +26,42 @@
     </div>
 
     <div id="clip">
-      <div id="book-shell">
-        <div id="book">
-          <div class="page" data-density="hard">
-            <div class="page-content flex items-center justify-center">
-              <p class="text-amber-900 opacity-60 italic text-lg text-center">Архив памяти</p>
-            </div>
-          </div>
-
-          <div class="page" data-density="soft" id="toc-page">
-            <div class="page-content">
-              <h2 class="text-4xl text-amber-900 mb-3 font-serif" style="text-align:center;">Оглавление</h2>
-              <div class="w-20 h-[2px] bg-amber-700/40 mx-auto mb-6"></div>
-              <ul id="toc-list"></ul>
-            </div>
-          </div>
-
-          <div class="page" data-density="hard" id="back-cover">
-            <div class="page-content bg-amber-900 text-amber-300 flex items-center justify-center">
-              <p class="text-amber-900 opacity-60 italic text-lg text-center">Летопись ведётся</p>
-            </div>
+      <div id="book">
+        <div class="page" data-density="hard">
+          <div class="cover-content">
+            <h1>Архив памяти</h1>
+            <p>Вечно скоротечные воспоминания</p>
           </div>
         </div>
-      </div>
 
-      <div id="front-cover">
-        <div class="cover-title">
-          <h1>Архив памяти</h1>
-          <p>Вечно скоротечные воспоминания</p>
+        <div class="page" data-density="hard">
+          <div class="page-content flex items-center justify-center">
+            <p class="text-amber-900 opacity-60 italic text-lg text-center">Архив памяти</p>
+          </div>
+        </div>
+
+        <div class="page" data-density="soft" id="toc-page">
+          <div class="page-content">
+            <h2 class="text-4xl text-amber-900 mb-3 font-serif" style="text-align:center;">Оглавление</h2>
+            <div class="w-20 h-[2px] bg-amber-700/40 mx-auto mb-6"></div>
+            <ul id="toc-list"></ul>
+          </div>
+        </div>
+
+        <div class="page" data-density="hard" id="inside-back-cover">
+          <div class="page-content bg-[#e6dbcc] flex items-center justify-center">
+            <p class="text-amber-900 opacity-60 italic text-lg text-center">Летопись ведётся</p>
+          </div>
+        </div>
+
+        <div class="page" data-density="hard">
+          <div class="cover-content"></div>
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
-<script>
-  // Функции разбиения текста оставлены без изменений
-  function tokenizeText(text) {
-    const normalized = (text || '').trim().replace(/\r/g,'').replace(/\n\s*\n/g, ' \n\n ');
-    return normalized.split(/\s+/).filter(Boolean);
-  }
-  function tokensToHtml(tokens) { return tokens.map(t => t === '\n\n' ? '<br><br>' : t).join(' '); }
-  function makeMeasurer(pageW, pageH) {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = `position:fixed; left:-99999px; top:0; width:${pageW}px; height:${pageH}px; visibility:hidden; pointer-events:none;`;
-    wrap.innerHTML = `<div class="page-content" style="height:${pageH}px; padding: 38px 40px;"></div>`;
-    document.body.appendChild(wrap);
-    const content = wrap.querySelector('.page-content');
-    return { fits(html) { content.innerHTML = html; return content.scrollHeight <= content.clientHeight + 1; }, destroy() { wrap.remove(); } };
-  }
-  function findMaxTokensFit(tokens, renderHtmlFn, measurer) {
-    let lo = 1, hi = tokens.length, best = 1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (measurer.fits(renderHtmlFn(tokens.slice(0, mid)))) { best = mid; lo = mid + 1; }
-      else { hi = mid - 1; }
-    }
-    return Math.max(1, best);
-  }
-  function buildPersonPages(person, measurer) {
-    const pages = [];
-    let rest = tokenizeText(person.short_info);
-    const title = (person.full_name || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const photo = (person.photo_path || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const renderFirst = (toks) => `<div class="page-content"><h3 class="hero-title">${title}</h3><div class="photo-frame"><img src="${photo}"></div><p class="book-text">${tokensToHtml(toks)}</p></div>`;
-    const renderNext = (toks) => `<div class="page-content"><h3 class="hero-title" style="font-size:1.7rem; margin-bottom:16px;">${title}</h3><p class="book-text">${tokensToHtml(toks)}</p></div>`;
-
-    if (rest.length) {
-      const take = findMaxTokensFit(rest, renderFirst, measurer);
-      pages.push({ density: 'soft', html: renderFirst(rest.slice(0, take)) });
-      rest = rest.slice(take);
-    } else pages.push({ density: 'soft', html: renderFirst([]) });
-
-    while (rest.length) {
-      const take = findMaxTokensFit(rest, renderNext, measurer);
-      pages.push({ density: 'soft', html: renderNext(rest.slice(0, take)) });
-      rest = rest.slice(take);
-    }
-    return pages;
-  }
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    const clip = document.getElementById('clip');
-    const bookThickness = document.getElementById('book-thickness');
-    const bookEl = document.getElementById('book');
-    const tocList = document.getElementById('toc-list');
-    const backCover = document.getElementById('back-cover');
-
-    // Настройка размеров
-    const screenW = window.innerWidth, screenH = window.innerHeight;
-    let pageH = Math.min(940, Math.floor(screenH * 0.90));
-    let pageW = Math.floor(pageH * 0.70);
-    if (pageW * 2 > screenW * 0.90) { pageW = Math.floor((screenW * 0.90) / 2); pageH = Math.floor(pageW / 0.70); }
-
-    document.documentElement.style.setProperty('--page-w', pageW + 'px');
-    document.documentElement.style.setProperty('--page-h', pageH + 'px');
-
-    // Загрузка
-    let persons = [];
-    try {
-      const r = await fetch('/api/v1/persons/');
-      if (r.ok) persons = await r.json();
-    } catch (err) { console.error("Ошибка API"); }
-
-    const measurer = makeMeasurer(pageW, pageH);
-    let currentPersonStartPage = 2;
-
-    persons.forEach((person, i) => {
-      const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.className = 'toc-btn';
-      btn.dataset.page = currentPersonStartPage;
-      btn.textContent = `${String(i + 1).padStart(2,'0')}. ${person.full_name}`;
-      li.appendChild(btn);
-      tocList.appendChild(li);
-
-      const personPages = buildPersonPages(person, measurer);
-      personPages.forEach(p => {
-        const pageDiv = document.createElement('div');
-        pageDiv.className = 'page';
-        pageDiv.setAttribute('data-density', p.density);
-        pageDiv.innerHTML = p.html;
-        bookEl.insertBefore(pageDiv, backCover);
-      });
-      currentPersonStartPage += personPages.length;
-    });
-    measurer.destroy();
-
-    // Добивка четности
-    if (bookEl.querySelectorAll('.page').length % 2 !== 0) {
-      const filler = document.createElement('div');
-      filler.className = 'page'; filler.setAttribute('data-density','soft');
-      filler.innerHTML = `<div class="page-content flex items-center justify-center"><p class="text-amber-900 opacity-60 italic text-lg">…</p></div>`;
-      bookEl.insertBefore(filler, backCover);
-    }
-
-    // Инициализация PageFlip
-    const pageFlip = new St.PageFlip(bookEl, {
-      width: pageW, height: pageH, size: "fixed", autoSize: true, flippingTime: 1100, maxShadowOpacity: 0.60,
-      showCover: false, disableFlipByClick: true, clickEventForward: true, swipeDistance: 95, useMouseEvents: true, showPageCorners: true
-    });
-    pageFlip.loadFromHTML(bookEl.querySelectorAll('.page'));
-    pageFlip.turnToPage(0);
-
-    let canNavigate = true;
-    pageFlip.on('changeState', (e) => canNavigate = (e.data === 'read'));
-    tocList.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-page]');
-      if (!btn || !canNavigate) return;
-      e.preventDefault(); e.stopPropagation();
-      pageFlip.flip(Number(btn.dataset.page), 'top');
-    }, { capture: true });
-
-    // --- 6. МАГИЯ GSAP ИЗОМЕТРИИ ---
-    // Стартовая позиция: глубоко внизу, наклонено под углом
-    gsap.set("#isometric-root", { opacity: 0, scale: 0.6, y: 300, rotateX: 25, rotateY: -20, rotateZ: -5 });
-    gsap.set([clip, bookThickness], { width: pageW });
-    gsap.set("#front-cover", { rotateY: 0 });
-
-    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
-    // 1) Взлет с парты в идеальную изометрию (чуть наклонена вперед и вбок)
-    tl.to("#isometric-root", {
-        opacity: 1, scale: 1, y: 0,
-        rotateX: 12, rotateY: -6, rotateZ: -1,
-        duration: 1.4, ease: "back.out(1.1)"
-    })
-      // 2) Смещение для разворота
-      .to("#isometric-root", { x: Math.floor(pageW * 0.18), duration: 0.8, ease: "power2.inOut" }, "+=0.1")
-      // 3) Приподнимаем крышку (видим объем)
-      .to("#front-cover", { rotateY: -45, duration: 0.6, ease: "power2.inOut" }, "+=0.05")
-      // 4) РАСШИРЯЕМ и книгу, и её объемную подложку
-      .to([clip, bookThickness], { width: pageW * 2, duration: 1.0, ease: "power2.inOut" }, "<+=0.10")
-      // 5) Распахиваем до конца
-      .to("#front-cover", { rotateY: -165, duration: 1.1, ease: "power2.inOut" }, "<+=0.05")
-      .set("#front-cover", { pointerEvents: "none" });
-
-    // Легкое "дыхание" 3D объекта в пространстве
-    tl.to("#isometric-root", {
-      y: -8,
-      rotateX: 14,
-      rotateY: -4,
-      duration: 3,
-      yoyo: true,
-      repeat: -1,
-      ease: "sine.inOut"
-    }, "+=0.2");
-  });
-</script>
+<script src="/static/js/script.js"></script>
 </body>
 </html>
