@@ -1,9 +1,15 @@
 from contextlib import asynccontextmanager
+import os
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from sqladmin import Admin, ModelView
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+
 from wtforms import FileField
-import os
+
+from sqladmin import Admin, ModelView
 
 from app.core.config import settings
 from app.db.session import init_db
@@ -11,6 +17,7 @@ from app.models.person import Person
 from app.api.v1 import persons
 from app.db.session import engine
 from app.services.storage import save_person_photo
+
 
 
 @asynccontextmanager
@@ -31,10 +38,9 @@ async def lifespan(fastapi_app: FastAPI):
 
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
-
+app.include_router(persons.router, prefix="/api/v1/persons", tags=["Persons"])
 # Статика и роутеры остаются как были
 app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
-app.include_router(persons.router, prefix="/api/v1", tags=["Persons"])
 
 # Настраиваем, как Hero будет выглядеть в админке
 class PersonAdmin(ModelView, model=Person):
@@ -62,6 +68,9 @@ admin = Admin(app, engine)
 admin.add_view(PersonAdmin)
 
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to Memory Book API"}
+templates = Jinja2Templates(directory="app/templates")
+
+@app.get("/", response_class=HTMLResponse)
+async def get_book(request: Request):
+    # Мы просто отдаем пустой файл, JS сам заберет данные через API
+    return templates.TemplateResponse("index.html", {"request": request})
