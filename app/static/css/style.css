@@ -1,67 +1,328 @@
 :root {
   --page-w: 520px;
   --page-h: 720px;
-  --book-w: calc(var(--page-w) * 2);
-  --book-h: var(--page-h);
   --paper: #f6f0e6;
-  --paper-2: #f0e7d9;
+  --paper-2: #efe4d2;
   --ink: #2b1b10;
   --accent: #8b4a22;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  overflow: hidden;
   color: var(--ink);
   font-family: "Literata", Georgia, serif;
-  background: radial-gradient(ellipse at center, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.65) 70%),
-              radial-gradient(ellipse at 30% 20%, rgba(255,180,120,0.08) 0%, rgba(0,0,0,0) 55%),
-              linear-gradient(180deg, #141414, #0b0b0b);
+  background:
+    radial-gradient(ellipse at center, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.65) 70%),
+    radial-gradient(ellipse at 30% 20%, rgba(255,180,120,0.08) 0%, rgba(0,0,0,0) 55%),
+    linear-gradient(180deg, #141414, #0b0b0b);
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-x: hidden;
 }
 
-#stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; perspective: 2000px; }
-#isometric-root { position: relative; width: var(--book-w); height: var(--page-h); transform-style: preserve-3d; }
-
-#book-thickness {
-  position: absolute; top: 0; left: var(--page-w); width: var(--page-w); height: var(--page-h);
-  background: var(--paper-2); border-radius: 4px 14px 14px 4px; transform: translateZ(-15px); transform-style: preserve-3d;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.4), 15px 30px 50px rgba(0,0,0,0.5), -10px 40px 60px rgba(0,0,0,0.3);
+.shell {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  width: 100%;
 }
 
-#spine-3d { position: absolute; left: 0; top: 0; width: 15px; height: 100%; background: linear-gradient(to right, #1a0d06, #3d1f0f); transform-origin: left; transform: rotateY(-90deg); border-radius: 10px 0 0 10px; }
-#pages-bottom-edge { position: absolute; left: 0; bottom: 0; width: 100%; height: 15px; background: repeating-linear-gradient(to right, #efe6d6 0px, #efe6d6 2px, #d8cbb5 4px); transform-origin: bottom; transform: rotateX(-90deg); border-radius: 0 0 10px 0; }
-#pages-right-edge { position: absolute; right: 0; top: 0; width: 15px; height: 100%; background: repeating-linear-gradient(to bottom, #efe6d6 0px, #efe6d6 2px, #d8cbb5 4px); transform-origin: right; transform: rotateY(90deg); border-radius: 0 10px 0 0; }
-
-#clip { width: var(--book-w); height: var(--page-h); position: relative; transform: translateZ(1px); }
-#book { width: var(--book-w); height: var(--book-h); }
-.page { background: var(--paper); }
-
-.page-content {
-  height: 100%; padding: 38px 40px; box-sizing: border-box; display: flex; flex-direction: column; position: relative;
-  background: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 60%), linear-gradient(180deg, var(--paper), var(--paper-2));
-}
-.page-content::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to right, rgba(0,0,0,0.12), rgba(0,0,0,0) 15%), linear-gradient(to left, rgba(0,0,0,0.12), rgba(0,0,0,0) 15%);
-  opacity: .6; mix-blend-mode: multiply;
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
-.cover-content {
-  width: 100%; height: 100%; position: relative;
-  background: linear-gradient(135deg, #6f3718, #a15a2b);
+.toolbar button,
+.toc button {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: #f6e6c5;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.toolbar button:hover,
+.toc button:hover {
+  background: rgba(255,255,255,0.14);
+}
+
+.toc {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(1100px, 92vw);
+}
+
+.toc button {
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.book-wrap {
+  width: calc(var(--page-w) * 2);
+  height: var(--page-h);
+  position: relative;
+  overflow: visible;
+  padding: 0;
+  margin: 10px auto 30px;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+#book.c-flipbook {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  visibility: hidden;
+}
+
+#book.c-flipbook.is-ready {
+  visibility: visible;
+}
+
+#book .c-flipbook__page {
+  width: var(--page-w);
+  height: var(--page-h);
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.sheet {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, var(--paper), var(--paper-2));
+  color: var(--ink);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 38px 40px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(0,0,0,0.12), rgba(0,0,0,0) 15%),
+    linear-gradient(to left, rgba(0,0,0,0.12), rgba(0,0,0,0) 15%);
+  opacity: .55;
+  mix-blend-mode: multiply;
+}
+
+.cover,
+.back-cover {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  border-radius: 0;
+  isolation: isolate;
+}
+
+.cover {
+  background: linear-gradient(135deg, #6f3718, #a15a2b) !important;
+  color: #fff3d6;
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.08), inset 0 -30px 60px rgba(0,0,0,.20);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff3d6; text-align: center;
 }
-.cover-content::before { content: ""; position: absolute; inset: 16px; border: 2px solid rgba(255,255,255,.20); border-radius: 14px; }
-.cover-content h1 { margin: 0; font-size: 3.0rem; font-weight: 600; font-family: "Cormorant Garamond", serif; text-shadow: 0 2px 10px rgba(0,0,0,.45); z-index: 2; }
-.cover-content p { margin-top: 14px; opacity: .9; font-style: italic; font-size: 1.2rem; z-index: 2; }
 
-h1, h2, h3 { font-family: "Cormorant Garamond", Georgia, serif; letter-spacing: .01em; }
-.hero-title { font-size: 2.0rem; font-weight: 600; color: #6b2f14; text-align: center; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(139,74,34,.25); }
-.photo-frame { border: 10px solid rgba(255,255,255,0.95); box-shadow: 0 10px 22px rgba(0,0,0,0.20); background: #efe7db; border-radius: 10px; overflow: hidden; aspect-ratio: 3/4; width: 100%; max-height: calc(var(--page-h) * 0.48); margin: 0 auto 18px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
-.photo-frame img { width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; }
-.book-text { font-size: 1.15rem; line-height: 1.75; color: rgba(43,27,16,0.92); font-style: italic; text-align: justify; hyphens: auto; }
-#toc-list { padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
-#toc-list li { list-style: none; }
-.toc-btn { width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.35); border: 1px solid rgba(139,74,34,.18); transition: transform .15s ease, background .15s ease; cursor: pointer; font-family: "Literata", Georgia, serif; font-size: 1.05rem; }
-.toc-btn:hover { transform: translateX(6px); background: rgba(255,255,255,.55); }
+.cover::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  border: 2px solid rgba(255,255,255,.20);
+  border-radius: 14px;
+  background: none;
+  mix-blend-mode: normal;
+  opacity: 1;
+}
+
+.cover h1,
+.cover h2 {
+  z-index: 1;
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+}
+
+.cover h1 {
+  font-size: 3rem;
+}
+
+.cover p {
+  z-index: 1;
+  margin-top: 14px;
+  font-style: italic;
+  font-size: 1.15rem;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  letter-spacing: .01em;
+  margin: 0;
+}
+
+.hero-title {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #6b2f14;
+  text-align: center;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(139,74,34,.25);
+  flex: 0 0 auto;
+}
+
+.hero-title--secondary {
+  font-size: 1.7rem;
+  margin-bottom: 16px;
+}
+
+.toc-title {
+  font-size: 2.5rem;
+  text-align: center;
+  color: #6b2f14;
+}
+
+.photo-frame {
+  border: 10px solid rgba(255,255,255,0.95);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.20);
+  background: #efe7db;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  max-height: calc(var(--page-h) * 0.46);
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.book-text {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.72;
+  color: rgba(43,27,16,0.92);
+  font-style: italic;
+  text-align: justify;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.sheet.center {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.muted {
+  opacity: .62;
+}
+
+.toc-page ul {
+  padding: 0;
+  margin: 18px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toc-page li {
+  list-style: none;
+}
+
+.toc-page button {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.35);
+  border: 1px solid rgba(139,74,34,.18);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.toc-page button:hover {
+  background: rgba(255,255,255,.55);
+  transform: translateX(4px);
+}
+
+.status {
+  color: #f6e6c5;
+  opacity: .82;
+  font-size: .95rem;
+}
+
+.endpaper {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0) 60%),
+    linear-gradient(180deg, #f2eadc, #eadcc6) !important;
+}
+
+.back-cover {
+  background: linear-gradient(135deg, #5a2b14 0%, #84461f 45%, #5f2d15 100%) !important;
+  color: #f3e5cb;
+  border: 1px solid rgba(64, 29, 12, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+.back-cover::before {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 12px;
+  background: none;
+  mix-blend-mode: normal;
+  opacity: 1;
+}
+
+.back-cover-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.back-cover p {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.45rem;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 1100px) {
+  body {
+    padding-inline: 12px;
+  }
+}

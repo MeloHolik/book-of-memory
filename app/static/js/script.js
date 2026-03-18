@@ -1,177 +1,336 @@
-function tokenizeText(text) {
-  const normalized = (text || '').trim().replace(/\r/g, '').replace(/\n\s*\n/g, ' \n\n ');
-  return normalized.split(/\s+/).filter(Boolean);
-}
-function tokensToHtml(tokens) {
-  return tokens.map(t => t === '\n\n' ? '<br><br>' : t).join(' ');
-}
-function makeMeasurer(pageW, pageH) {
-  const wrap = document.createElement('div');
-  wrap.style.cssText = `position:fixed; left:-99999px; top:0; width:${pageW}px; height:${pageH}px; visibility:hidden; pointer-events:none;`;
-  wrap.innerHTML = `<div class="page-content" style="height:${pageH}px; padding: 38px 40px;"></div>`;
-  document.body.appendChild(wrap);
-  const content = wrap.querySelector('.page-content');
-  return {
-    fits(html) {
-      content.innerHTML = html;
-      return content.scrollHeight <= content.clientHeight + 1;
-    },
-    destroy() { wrap.remove(); }
-  };
-}
-function findMaxTokensFit(tokens, renderHtmlFn, measurer) {
-  let lo = 1,
-    hi = tokens.length,
-    best = 1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (measurer.fits(renderHtmlFn(tokens.slice(0, mid)))) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
+(() => {
+  'use strict';
+
+  const PERSONS_API_URL = '/api/v1/persons/';
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function tokenizeText(text) {
+    const normalized = String(text || '')
+      .trim()
+      .replace(/\r/g, '')
+      .replace(/\n\s*\n/g, ' \n\n ');
+
+    return normalized.split(/\s+/).filter(Boolean);
+  }
+
+  function tokensToHtml(tokens) {
+    return tokens
+      .map((token) => (token === '\n\n' ? '<br><br>' : escapeHtml(token)))
+      .join(' ');
+  }
+
+  function computePageSize() {
+    const sw = window.innerWidth;
+    const sh = window.innerHeight;
+    let pageH = Math.min(900, Math.floor(sh * 0.78));
+    let pageW = Math.floor(pageH * 0.70);
+
+    if (pageW * 2 > sw * 0.9) {
+      pageW = Math.floor((sw * 0.9) / 2);
+      pageH = Math.floor(pageW / 0.70);
+    }
+
+    document.documentElement.style.setProperty('--page-w', pageW + 'px');
+    document.documentElement.style.setProperty('--page-h', pageH + 'px');
+
+    return { pageW, pageH };
+  }
+
+  async function ensureBookFonts() {
+    if (!document.fonts || !document.fonts.load) {
+      return;
+    }
+
+    const probes = [
+      document.fonts.load('600 48px "Cormorant Garamond"', 'Архив памяти'),
+      document.fonts.load('600 36px "Cormorant Garamond"', 'Кира Йошикаге'),
+      document.fonts.load('500 20px "Cormorant Garamond"', 'Летопись ведётся'),
+      document.fonts.load('400 18px "Literata"', 'Меня зовут Кира Йошикаге')
+    ];
+
+    try {
+      await Promise.all(probes);
+      await document.fonts.ready;
+    } catch {
+      // Если веб-шрифты не загрузились, продолжаем с fallback-шрифтами.
     }
   }
-  return Math.max(1, best);
-}
-function buildPersonPages(person, measurer) {
-  const pages = [];
-  let rest = tokenizeText(person.short_info);
-  const title = (person.full_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const photo = (person.photo_path || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const renderFirst = (toks) => `<div class="page-content"><h3 class="hero-title">${title}</h3><div class="photo-frame"><img src="${photo}"></div><p class="book-text">${tokensToHtml(toks)}</p></div>`;
-  const renderNext = (toks) => `<div class="page-content"><h3 class="hero-title" style="font-size:1.7rem; margin-bottom:16px;">${title}</h3><p class="book-text">${tokensToHtml(toks)}</p></div>`;
 
-  if (rest.length) {
-    const take = findMaxTokensFit(rest, renderFirst, measurer);
-    pages.push({ density: 'soft', html: renderFirst(rest.slice(0, take)) });
-    rest = rest.slice(take);
-  } else pages.push({ density: 'soft', html: renderFirst([]) });
+  function makeMeasurer(pageW, pageH) {
+    const host = document.createElement('div');
+    host.style.cssText = [
+      'position:fixed',
+      'left:-99999px',
+      'top:0',
+      'width:' + pageW + 'px',
+      'height:' + pageH + 'px',
+      'visibility:hidden',
+      'pointer-events:none',
+      'overflow:hidden'
+    ].join(';');
 
-  while (rest.length) {
-    const take = findMaxTokensFit(rest, renderNext, measurer);
-    pages.push({ density: 'soft', html: renderNext(rest.slice(0, take)) });
-    rest = rest.slice(take);
-  }
-  return pages;
-}
+    document.body.appendChild(host);
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const bookEl = document.getElementById('book');
-  const tocList = document.getElementById('toc-list');
-  const insideBackCover = document.getElementById('inside-back-cover');
-
-  // Размеры
-  const screenW = window.innerWidth,
-    screenH = window.innerHeight;
-  let pageH = Math.min(940, Math.floor(screenH * 0.90));
-  let pageW = Math.floor(pageH * 0.70);
-  if (pageW * 2 > screenW * 0.90) {
-    pageW = Math.floor((screenW * 0.90) / 2);
-    pageH = Math.floor(pageW / 0.70);
+    return {
+      fits(html) {
+        host.innerHTML = html;
+        const inner = host.firstElementChild;
+        if (!inner) {
+          return true;
+        }
+        return inner.scrollHeight <= inner.clientHeight + 1;
+      },
+      destroy() {
+        host.remove();
+      }
+    };
   }
 
-  document.documentElement.style.setProperty('--page-w', pageW + 'px');
-  document.documentElement.style.setProperty('--page-h', pageH + 'px');
+  function findMaxTokensFit(tokens, render, measurer) {
+    let lo = 0;
+    let hi = tokens.length;
+    let best = 0;
 
-  // Данные
-  let persons = [];
-  try {
-    const r = await fetch('/api/v1/persons/');
-    if (r.ok) persons = await r.json();
-  } catch (err) {
-    console.error("Ошибка API");
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (measurer.fits(render(tokens.slice(0, mid)))) {
+        best = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+
+    return best;
   }
 
-  const measurer = makeMeasurer(pageW, pageH);
+  function createImageHtml(src, alt) {
+    if (!src) {
+      return '<div class="photo-frame"><div class="muted">Нет изображения</div></div>';
+    }
 
-  let currentPersonStartPage = 3;
+    return (
+      '<div class="photo-frame">' +
+        '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '">' +
+      '</div>'
+    );
+  }
 
-  persons.forEach((person, i) => {
-    const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.className = 'toc-btn';
-    btn.dataset.page = currentPersonStartPage;
-    btn.textContent = `${String(i + 1).padStart(2,'0')}. ${person.full_name}`;
-    li.appendChild(btn);
-    tocList.appendChild(li);
+  function personPages(person, measurer) {
+    const pages = [];
+    let rest = tokenizeText(person.short_info);
+    const title = escapeHtml(person.full_name);
+    const photoHtml = createImageHtml(person.photo_path, person.full_name);
 
-    const personPages = buildPersonPages(person, measurer);
-    personPages.forEach(p => {
-      const pageDiv = document.createElement('div');
-      pageDiv.className = 'page';
-      pageDiv.setAttribute('data-density', p.density);
-      pageDiv.innerHTML = p.html;
-      bookEl.insertBefore(pageDiv, insideBackCover);
+    const renderFirst = (tokens) => `
+      <div class="sheet">
+        <h3 class="hero-title">${title}</h3>
+        ${photoHtml}
+        ${tokens.length ? `<p class="book-text">${tokensToHtml(tokens)}</p>` : ''}
+      </div>`;
+
+    const renderNext = (tokens) => `
+      <div class="sheet">
+        <h3 class="hero-title hero-title--secondary">${title}</h3>
+        <p class="book-text">${tokensToHtml(tokens)}</p>
+      </div>`;
+
+    if (rest.length) {
+      const firstTake = findMaxTokensFit(rest, renderFirst, measurer);
+
+      if (firstTake > 0) {
+        pages.push(renderFirst(rest.slice(0, firstTake)));
+        rest = rest.slice(firstTake);
+      } else {
+        pages.push(renderFirst([]));
+      }
+    } else {
+      pages.push(renderFirst([]));
+    }
+
+    while (rest.length) {
+      let take = findMaxTokensFit(rest, renderNext, measurer);
+      if (take === 0) {
+        take = 1;
+      }
+      pages.push(renderNext(rest.slice(0, take)));
+      rest = rest.slice(take);
+    }
+
+    return pages;
+  }
+
+  function createPage(html) {
+    const div = document.createElement('div');
+    div.className = 'c-flipbook__page';
+    div.innerHTML = html;
+    return div;
+  }
+
+  async function fetchPersons() {
+    const response = await fetch(PERSONS_API_URL);
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function init() {
+    const status = document.getElementById('status');
+    const bookEl = document.getElementById('book');
+    const tocFloating = document.getElementById('floating-toc');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const rebuildBtn = document.getElementById('rebuild');
+
+    rebuildBtn.addEventListener('click', () => window.location.reload());
+
+    const { pageW, pageH } = computePageSize();
+    status.textContent = 'Загружаю шрифты и данные…';
+
+    let persons = [];
+    try {
+      const [loadedPersons] = await Promise.all([
+        fetchPersons(),
+        ensureBookFonts()
+      ]);
+      persons = loadedPersons;
+    } catch (err) {
+      status.textContent = 'Не удалось загрузить /api/v1/persons/';
+      console.error(err);
+      return;
+    }
+
+    status.textContent = 'Собираю страницы…';
+
+    const measurer = makeMeasurer(pageW, pageH);
+    const pageNodes = [];
+    const tocMap = [];
+
+    try {
+      pageNodes.push(createPage(`
+        <div class="sheet cover">
+          <h1>Архив памяти</h1>
+          <p>Вечно скоротечные воспоминания</p>
+        </div>
+      `));
+
+      pageNodes.push(createPage(`
+        <div class="sheet center">
+          <p class="muted"><em>Архив памяти</em></p>
+        </div>
+      `));
+
+      const tocHtmlParts = [
+        '<div class="sheet toc-page"><h2 class="toc-title">Оглавление</h2><ul>'
+      ];
+      let currentPageIndex = 3;
+
+      persons.forEach((person, idx) => {
+        tocMap.push({
+          label: String(idx + 1).padStart(2, '0') + '. ' + person.full_name,
+          page: currentPageIndex
+        });
+
+        tocHtmlParts.push(
+          '<li><button type="button" data-page="' + currentPageIndex + '">' +
+            String(idx + 1).padStart(2, '0') + '. ' + escapeHtml(person.full_name) +
+          '</button></li>'
+        );
+
+        const built = personPages(person, measurer);
+        built.forEach((html) => pageNodes.push(createPage(html)));
+        currentPageIndex += built.length;
+      });
+
+      tocHtmlParts.push('</ul></div>');
+      pageNodes.splice(2, 0, createPage(tocHtmlParts.join('')));
+
+      if (pageNodes.length % 2 === 0) {
+        pageNodes.push(createPage('<div class="sheet endpaper"></div>'));
+      }
+
+      pageNodes.push(createPage(`
+        <div class="sheet back-cover">
+          <div class="back-cover-inner">
+            <p>Летопись ведётся</p>
+          </div>
+        </div>
+      `));
+    } finally {
+      measurer.destroy();
+    }
+
+    bookEl.replaceChildren(...pageNodes);
+
+    let book;
+
+    function renderStatus(total) {
+      const active = book.getActivePages();
+      if (!active || active.length === 0) {
+        return;
+      }
+
+      const label = active.length >= 2
+        ? (active[0] + 1) + '–' + (active[active.length - 1] + 1)
+        : String(active[0] + 1);
+
+      status.textContent = 'Страница: ' + label + ' / ' + total;
+    }
+
+    book = new FlipBook('book', {
+      width: String(pageW * 2) + 'px',
+      height: String(pageH) + 'px',
+      nextButton: nextBtn,
+      previousButton: prevBtn,
+      arrowKeys: true,
+      canClose: true,
+      initialActivePage: 0,
+      onPageTurn() {
+        renderStatus(pageNodes.length);
+      }
     });
-    currentPersonStartPage += personPages.length;
-  });
-  measurer.destroy();
 
-  if (bookEl.querySelectorAll('.page').length % 2 !== 0) {
-    const filler = document.createElement('div');
-    filler.className = 'page';
-    filler.setAttribute('data-density', 'soft');
-    filler.innerHTML = `<div class="page-content flex items-center justify-center"><p class="text-amber-900 opacity-60 italic text-lg">…</p></div>`;
-    bookEl.insertBefore(filler, insideBackCover);
+    renderStatus(pageNodes.length);
+    bookEl.classList.add('is-ready');
+
+    document.body.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-page]');
+      if (!btn) {
+        return;
+      }
+
+      const page = Number(btn.dataset.page);
+      if (Number.isFinite(page)) {
+        book.turnPage(page);
+      }
+    });
+
+    tocFloating.replaceChildren();
+    tocMap.forEach((entry) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.page = String(entry.page);
+      button.textContent = entry.label;
+      tocFloating.appendChild(button);
+    });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => window.location.reload(), 220);
+    });
   }
 
-  const pageFlip = new St.PageFlip(bookEl, {
-    width: pageW,
-    height: pageH,
-    size: "fixed",
-    autoSize: true,
-    flippingTime: 1100,
-    maxShadowOpacity: 0.60,
-    showCover: true,
-    disableFlipByClick: true,
-    clickEventForward: true,
-    swipeDistance: 95,
-    useMouseEvents: true,
-    showPageCorners: true
-  });
-  pageFlip.loadFromHTML(bookEl.querySelectorAll('.page'));
-
-  let canNavigate = true;
-  pageFlip.on('changeState', (e) => canNavigate = (e.data === 'read'));
-  tocList.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-page]');
-    if (!btn || !canNavigate) return;
-    e.preventDefault();
-    e.stopPropagation();
-    pageFlip.flip(Number(btn.dataset.page), 'top');
-  }, { capture: true });
-
-  const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
-
-  gsap.set("#isometric-root", {
-    opacity: 0, scale: 0.6, y: 300,
-    x: -(pageW / 2),
-    rotateX: 12, rotateY: -6, rotateZ: -1
-  });
-
-  gsap.set("#book-thickness", { left: pageW, width: pageW });
-
-  tl.to("#isometric-root", {
-      opacity: 1, scale: 1, y: 0,
-      duration: 1.4, ease: "back.out(1.1)"
-    })
-    .add(() => {
-      pageFlip.flipNext();
-    })
-    .to("#isometric-root", {
-      x: 0,
-      duration: 1.1,
-      ease: "power1.inOut"
-    }, "+=0.0")
-    .to("#book-thickness", {
-      left: 0,
-      width: pageW * 2,
-      duration: 1.1,
-      ease: "power1.inOut"
-    }, "<");
-
-  tl.to("#isometric-root", {
-    y: -8, rotateX: 14, rotateY: -4, duration: 3, yoyo: true, repeat: -1, ease: "sine.inOut"
-  }, "+=0.2");
-});
+  init();
+})();
