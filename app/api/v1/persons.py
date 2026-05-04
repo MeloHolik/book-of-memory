@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.db.session import get_session
 from app.models.person import Person
 from app.services.storage import save_person_photo  # Наш новый сервис
@@ -38,6 +38,13 @@ def get_persons(
     persons = db.exec(select(Person).offset(offset).limit(limit)).all()
     return persons
 
+@router.get("/count")
+def get_persons_count(db: Session = Depends(get_session)): # Убрал скобки у get_session, если это генератор
+    # Используем select для создания запроса и func.count для подсчета
+    statement = select(func.count()).select_from(Person)
+    count = db.exec(statement).one()
+    return {"count": count}
+
 @router.get("/{person_id}", response_model=Person)
 def get_person(person_id: int, db: Session = Depends(get_session)):
     """Получаем данные одного конкретного героя"""
@@ -45,3 +52,4 @@ def get_person(person_id: int, db: Session = Depends(get_session)):
     if not person:
         raise HTTPException(status_code=404, detail="Герой не найден")
     return person
+

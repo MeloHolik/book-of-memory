@@ -1,33 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Архив памяти — flipbook-js (stable)</title>
+  <title>Архив памяти — turn.js</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Literata:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flipbook-js@1.1.1/dist/flipbook.min.css">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="{{ url_for('static', path='/turnjs-sj/css/styles.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', path='/turnjs-sj/css/newstyles.css') }}?v=3">
+  <!-- Оригинальные зависимости (не смешивать с jquery 3.x) -->
+  <script src="{{ url_for('static', path='/turnjs-sj/extras/jquery.min.1.7.js') }}?v=reset2"></script>
+  <script src="{{ url_for('static', path='/turnjs-sj/lib/turn.min.js') }}?v=reset2"></script>
+  <link rel="preload" href="/static/turnjs-sj/fonts/Stempel-Garamond-W01-Roman.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="/static/turnjs-sj/fonts/playfairdisplay-webfont.woff2" as="font" type="font/woff2" crossorigin>
 
-  <script defer src="https://cdn.jsdelivr.net/npm/flipbook-js@1.1.1/dist/flipbook.umd.min.js"></script>
-  <script defer src="/static/js/script.js"></script>
 </head>
+
 <body>
-  <div class="shell">
-    <div class="toolbar">
-      <button id="prev">← Назад</button>
-      <button id="next">Вперёд →</button>
-      <button id="rebuild">↻ Пересобрать</button>
-      <span class="status" id="status">Загрузка…</span>
-    </div>
+  <div id="toolbar">
+    <div class="brand">book_of_memory</div>
+    <button id="prevBtn" type="button">← Назад</button>
+    <div class="status" id="status">Загрузка…</div>
+    <div id="pageLabel">Стр. 1 / ?</div>
+    <button id="nextBtn" type="button">Вперёд →</button>
+    <button id="tocBtn" type="button" class="tocbtn">Оглавление</button>
+  </div>
 
-    <div class="toc" id="floating-toc"></div>
-
-    <div class="book-wrap">
-      <div class="c-flipbook" id="book"></div>
+  <!-- Overlay TOC -->
+  <div id="tocOverlay">
+    <div id="tocPanel">
+      <h3>Оглавление</h3>
+      <div id="tocList"></div>
+      <div style="opacity:.6;font-size:12px;margin-top:8px">
+		  Клик по записи — переход на её первую страницу</div>
     </div>
   </div>
+
+  <div id="canvas">
+    <div id="book-zoom">
+      <div class="sj-book" id="book">
+        <!-- первые 4 страницы как в Steve Jobs sample -->
+        <div depth="5" class="hard p1 cover-front-outer">
+          <div class="memory-cover-title">
+            <span>Архив</span>
+            <span>памяти</span>
+          </div>
+          <div class="side"></div>
+        </div>
+        <div depth="5" class="hard front-side p2 cover-front-inner"><div class="depth"></div></div>
+      </div>
+
+      <!-- зоны клика -->
+      <div id="clickLeft" style="position:absolute;top:0;bottom:0;left:0;width:50%;z-index:5"></div>
+      <div id="clickRight" style="position:absolute;top:0;bottom:0;right:0;width:50%;z-index:5"></div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', path='/turnjs-sj/js/script.js') }}?v=3"></script>
 </body>
 </html>
