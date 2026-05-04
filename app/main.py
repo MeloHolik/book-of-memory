@@ -59,6 +59,13 @@ class PersonAdmin(ModelView, model=Person):
         "photo_path": {"label": "Загрузить фото"}
     }
 
+    form_widget_args = {
+        "short_info": {
+            "rows": 10,  # Высота поля
+            "class": "form-control"  # Чтобы выглядело аккуратно (стиль Bootstrap)
+        }
+    }
+
     async def on_model_change(self, data, model, is_created, request):
         file = data.get("photo_path")
 

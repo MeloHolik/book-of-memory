@@ -392,6 +392,7 @@ body, ul, table, form{
 	text-indent: 18px;
 	margin: 10px 0;
 	line-height: 24px;
+	white-space: pre-wrap;
 }
 
 .sj-book .book-content .capital,
