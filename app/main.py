@@ -69,13 +69,25 @@ class PersonAdmin(ModelView, model=Person):
     async def on_model_change(self, data, model, is_created, request):
         file = data.get("photo_path")
 
-        # Если реально пришёл новый файл — сохраняем и кладём путь в БД
+        # Если реально пришёл новый файл
         if hasattr(file, "filename") and file.filename:
-            data["photo_path"] = save_person_photo(file)
-        else:
-            # Если файла нет, не даём пустому значению перетереть существующий путь
-            data.pop("photo_path", None)
+            # 1. Проверка расширения
+            ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+            _, ext = os.path.splitext(file.filename.lower())
 
+            if ext not in ALLOWED_EXTENSIONS:
+                # Если расширение плохое — убираем из данных, чтобы не сохранить мусор
+                data.pop("photo_path", None)
+                return
+
+            # 2. Сохраняем файл (через uuid в storage.py)
+            data["photo_path"] = save_person_photo(file)
+
+        else:
+            # ЭТОТ БЛОК НУЖЕН: если файл не прислали (например, при редактировании текста),
+            # мы удаляем ключ photo_path из словаря data, чтобы SQLAlchemy не пыталась
+            # записать туда None и не затерла путь к уже существующей картинке.
+            data.pop("photo_path", None)
 
 admin = Admin(app, engine)
 admin.add_view(PersonAdmin)
