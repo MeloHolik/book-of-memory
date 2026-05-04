@@ -201,7 +201,8 @@
     return out;
   }
 
-  function tokensToHtml(tokens, withPhoto, photoUrl, alt) {
+// Добавили аргумент isContinuation в конец
+  function tokensToHtml(tokens, withPhoto, photoUrl, alt, isContinuation) {
     if (!tokens.length) return '<p class="no-indent">Описание отсутствует.</p>';
 
     var paras = [];
@@ -232,8 +233,11 @@
             ' height="' + Math.round(PHOTO_RENDER_W * size.h / size.w) + '"';
         }
 
-        html += '<p class="no-indent"><img class="mem-photo" src="' +
+        html += '<p><img class="mem-photo" src="' +
           esc(photoUrl) + '" alt="' + esc(alt) + '"' + sizeAttrs + '>' + txt + '</p>';
+      } else if (k === 0 && isContinuation) {
+        // Если это продолжение текста с прошлой страницы, убираем отступ
+        html += '<p class="no-indent">' + txt + '</p>';
       } else {
         html += '<p>' + txt + '</p>';
       }
@@ -242,14 +246,14 @@
     return html;
   }
 
-  function renderPersonPage(person, part, totalParts, tokenSlice) {
+  function renderPersonPage(person, part, totalParts, tokenSlice, isContinuation) {
     var title = esc(person.full_name || 'Без имени');
     var subtitle = (totalParts > 1)
       ? ('Запись · часть ' + (part + 1) + ' / ' + totalParts)
       : 'Запись';
 
     var photoUrl = (part === 0) ? (person.photo_path || '') : '';
-    var body = tokensToHtml(tokenSlice, part === 0, photoUrl, person.full_name || '');
+    var body = tokensToHtml(tokenSlice, part === 0, photoUrl, person.full_name || '', isContinuation);
 
     return '' +
       '<div class="book-content">' +
@@ -343,37 +347,45 @@
 
       var parts = [];
       var rest = tokens.slice();
+      var isContinuation = false;
 
       var firstRender = function (slice) {
-        return renderPersonPage(person, 0, 1, slice);
+        return renderPersonPage(person, 0, 1, slice, false);
       };
 
       var take = findFit(rest, firstRender, measurer);
       if (!take) take = 1;
 
-      parts.push(rest.slice(0, take));
+      isContinuation = (take > 0 && take < rest.length && rest[take - 1] !== PARA_TOKEN && rest[take] !== PARA_TOKEN);
+
+      parts.push({ slice: rest.slice(0, take), isCont: false });
       rest = rest.slice(take);
 
       while (rest.length) {
         var partIndex = parts.length;
 
-        (function (currentPartIndex) {
+        // В этой функции два параметра...
+        (function (currentPartIndex, currentIsCont) {
           var contRender = function (slice) {
-            return renderPersonPage(person, currentPartIndex, 1, slice);
+            return renderPersonPage(person, currentPartIndex, 1, slice, currentIsCont);
           };
 
           var t = findFit(rest, contRender, measurer);
           if (!t) t = 1;
 
-          parts.push(rest.slice(0, t));
+          parts.push({ slice: rest.slice(0, t), isCont: currentIsCont });
+
+          // Обновляем значение для следующего шага цикла
+          isContinuation = (t > 0 && t < rest.length && rest[t - 1] !== PARA_TOKEN && rest[t] !== PARA_TOKEN);
+
           rest = rest.slice(t);
-        })(partIndex);
+        })(partIndex, isContinuation); // <-- ОШИБКА БЫЛА ТУТ: нужно добавить второй аргумент
       }
 
       for (var k = 0; k < parts.length; k++) {
-        (function (personRef, partIndex, totalParts, tokenSlice) {
+        (function (personRef, partIndex, totalParts, partData) {
           models.push(function () {
-            return renderPersonPage(personRef, partIndex, totalParts, tokenSlice);
+            return renderPersonPage(personRef, partIndex, totalParts, partData.slice, partData.isCont);
           });
         })(person, k, parts.length, parts[k]);
 
